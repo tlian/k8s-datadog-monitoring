@@ -4,6 +4,14 @@ Monitoring Kubernetes cluster with Datadog
 > More info: https://www.datadoghq.com/blog/monitoring-kubernetes-with-datadog
 
 ### Steps
+The following steps will lead to build/configure
+  - deploy node based Datadog agent (i.e. datadog-agent)
+  - deploy cluster based Datadog agent (i.e. datadog-cluster-agent)
+  - create necessary permission and secrets to establish secure communication
+  - deploy kube-state-metrics which is essential component to enable cluster-level metrics reporting
+  - enable logs collection (i.e. both in Kubernestes cluster-level and containerized applications)
+  - document a few other knowledge
+
 1. Configure Permissions and Secrets (ClusterRole, ClusterRoleBinding, ServiceAccount)
 ```
 kubectl create -f "https://raw.githubusercontent.com/DataDog/datadog-agent/master/Dockerfiles/manifests/cluster-agent/rbac/rbac-agent.yaml"
@@ -82,3 +90,35 @@ annotations:
       - name: DD_TAGS
         value: cluster-codename:melange team:core-platform
    ```
+
+12. Collect Logs
+  * Enable logs collection from containers. In datadog-agent.yaml manifest, set the following environment variables
+  ```
+  env:
+    [...]
+      - name: DD_LOGS_ENABLED
+        value: "true"
+      - name: DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL
+        value: "true"
+      - name: DD_AC_EXCLUDE
+        value: "name:datadog-agent"
+  ```
+  In the above example, DD_AC_EXCLUDE ensured datadog-agent to omit its own logs.
+  * Add the following `volumeMounts` and `volumes`
+  ```
+  volumeMounts:
+    [...]
+      - name: pointdir
+        mountPath: /opt/datadog-agent/run
+    [...]
+  volumes:
+    [...]
+      - hostPath: 
+          path: /opt/datadog-agent/run
+        name: pointdir
+  ```
+  * Update cluster configuration
+  ```
+  kubectl apply -f datadog-agent.yaml
+  ```
+  * To view logs, go to https://app.datadoghq.com/logs
