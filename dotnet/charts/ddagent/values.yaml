@@ -1,0 +1,3 @@
+# Application log
+path_to_log_dir: /var/log/mydotnet
+config_map_name: cm-alpha-dotnet

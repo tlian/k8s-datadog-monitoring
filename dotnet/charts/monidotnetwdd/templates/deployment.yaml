@@ -1,0 +1,50 @@
+---
+# Manifest to deploy Dotnet App
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "monidotnetwdd.fullname" . }}
+  labels:
+    {{- include "monidotnetwdd.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "monidotnetwdd.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "monidotnetwdd.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - name: logdir
+            mountPath: {{ .Values.path_to_log_dir }}
+      volumes:
+        - hostPath:
+            path: {{ .Values.path_to_log_dir }}
+          name: logdir
+
+---
+# Manifest to tail/ship application's log file 
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ .Values.config_map_name }}
+data:
+  mydotnetlogs.yaml: |-
+    init_config:
+    instances:
+    logs:
+      - type: file
+        path: {{ .Values.path_to_log_file }}
+        service: alpha
+        source: dotnet
+        sourcecategory: sourcecode

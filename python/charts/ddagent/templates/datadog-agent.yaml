@@ -1,0 +1,153 @@
+# Kubernetes manifest to deploy Datadog agent
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: datadog-agent
+spec:
+  selector:
+    matchLabels:
+      app: datadog-agent
+  template:
+    metadata:
+      labels:
+        app: datadog-agent
+      name: datadog-agent
+    spec:
+      serviceAccountName: datadog
+      containers:
+      - image: datadog/agent:7
+        imagePullPolicy: Always
+        name: datadog-agent
+        ports:
+          - containerPort: 8125
+            # Custom metrics via DogStatsD - uncomment this section to enable custom metrics collection
+            # hostPort: 8125
+            name: dogstatsdport
+            protocol: UDP
+          - containerPort: 8126
+            # Trace Collection (APM) - uncomment this section to enable APM
+            # hostPort: 8126
+            name: traceport
+            protocol: TCP
+        env:
+          # - name: DD_LOG_LEVEL
+          #   value: debug
+          # force the Agent to go for the file collection mode
+          - name: DD_LOGS_CONFIG_K8S_CONTAINER_USE_FILE
+            value: "true"
+          # - name: DD_CONTAINER_EXCLUDE
+          #   value: "name:datadog-agent"
+          - name: DD_LOGS_INJECTION
+            value: "true"
+          - name: DD_LOGS_ENABLED
+            value: "true"
+          - name: DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL
+            value: "true"
+          - name: DD_AC_EXCLUDE
+            value: "name:datadog-agent"
+          - name: DD_KUBELET_TLS_VERIFY
+            value: "false"
+          - name: DD_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: datadog-secret
+                key: api-key
+          - name: DD_COLLECT_KUBERNETES_EVENTS
+            value: "true"
+          - name: DD_LEADER_ELECTION
+            value: "true"
+          - name: KUBERNETES
+            value: "true"
+          - name: DD_HEALTH_PORT
+            value: "5555"
+          - name: DD_KUBERNETES_KUBELET_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          - name: DD_CLUSTER_AGENT_ENABLED
+            value: "true"
+          - name: DD_CLUSTER_AGENT_AUTH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: datadog-auth-token
+                key: token
+          - name: DD_APM_ENABLED
+            value: "true"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+          # mounting /conf.d fixed the issue of application's log file
+          # being not picked by Datadog agent. It did not appear this requirement
+          # being mentioned anywhere in Datadog documentation
+          # https://docs.datadoghq.com/agent/kubernetes/log/
+          - name: vol-datadog-confd
+            mountPath: /conf.d
+          - name: logdir
+            mountPath: {{ .Values.path_to_log_dir }}
+          # /path-to-log/proc is required to keep track of last line read
+          - name: pointdir
+            mountPath: {{ .Values.path_to_log_dir }}/proc
+          # The following logcontainerpath, dockersocket, procdir, cgroups
+          # were required for Autodiscovery to work properly
+          # Docker runtime directory, replace this path
+          # with your container runtime logs directory,
+          # or remove this configuration if `/var/log/pods`
+          # is not a symlink to any other directory.
+          - name: logcontainerpath
+            mountPath: /var/lib/docker/containers
+          - name: dockersocket
+            mountPath: /var/run/docker.sock
+          - name: procdir
+            mountPath: /host/proc
+            readOnly: true
+          - name: cgroups
+            mountPath: /host/sys/fs/cgroup
+            readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5555
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+        # importing configmap - make sure this configmap is an existing resource
+        - name: vol-datadog-confd 
+          configMap:
+            name: {{ .Values.config_map_name }}
+        # path to application's log
+        - hostPath:
+            path: {{ .Values.path_to_log_dir }}
+          name: logdir
+        # /path-to-log/proc is required to keep track of last line read
+        - hostPath:
+            path: {{ .Values.path_to_log_dir }}/proc
+          name: pointdir
+        # The following logpodpath, logcontainerpath, dockersocket, procdir, cgroups
+        # were required for Autodiscovery to work properly
+        - hostPath:
+            path: /var/log/pods
+          name: logpodpath
+        # Docker runtime directory, replace this path
+        # with your container runtime logs directory,
+        # or remove this configuration if `/var/log/pods`
+        # is not a symlink to any other directory.
+        - hostPath:
+            path: /var/lib/docker/containers
+          name: logcontainerpath
+        - hostPath:
+            path: /var/run/docker.sock
+          name: dockersocket
+        - hostPath:
+            path: /proc
+          name: procdir
+        - hostPath:
+            path: /sys/fs/cgroup
+          name: cgroups

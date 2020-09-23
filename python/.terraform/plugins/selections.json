@@ -1,0 +1,6 @@
+{
+  "registry.terraform.io/hashicorp/helm": {
+    "hash": "h1:mM8EWp4t42WGEqwpVElYq4zYqe0bxsOWnWuOHS39rBo=",
+    "version": "1.3.0"
+  }
+}

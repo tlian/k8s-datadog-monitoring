@@ -1,0 +1,3 @@
+# Application log
+path_to_log_dir: /var/log/flashblog
+config_map_name: applog-config
