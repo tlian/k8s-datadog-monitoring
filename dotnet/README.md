@@ -18,7 +18,7 @@ and monitored when Autodiscovery is enabled. Output from container's stdout/stde
 > See [k8s](../k8s) folder for monitoring Kubernetes cluster with Datadog
 
 ## Example
-The following example assumed an existing AKS cluster.
+The following example assumed an existing AKS cluster. To quickly spin up one, see [aks-playground](https://github.com/openrba/aks-playground)
 
  - Build docker image
  ```
@@ -31,20 +31,18 @@ The following example assumed an existing AKS cluster.
  docker image build <Docker-hub-username>/alpha
  ```
 
- - Deploy .NET application to AKS cluster.
+ - Deploy app to AKS cluster
  ```
- kubectl apply -f alpha.yaml
+ cd monitoring-with-datadog/dotnet
+ terraform init
+ terraform plan
+ terraform apply -auto-approve
  ```
 
-> Note that the order of deployment is important here. Manifest *alpha.yaml* contained a configMap that is referenced by datadog-agent.yaml
-
- - Deploy Datadog agent
- ```
- kubectl apply -f datadog-agent.yaml
- ```
+ - View metrics in Datadog
+   Go to [Kubernetes Dashboard](https://app.datadoghq.com/screen/integration/86/kubernetes) in Datadog portal
 
  - Clean up
  ```
- kubectl delete -f alpha.yaml
- kubectl delete -f datadog-agent.yaml
+ terraform destroy -auto-approve
  ```
